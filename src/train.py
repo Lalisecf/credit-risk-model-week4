@@ -1,6 +1,5 @@
 # ==========================================
 # train.py
-# Task 5
 # Credit Risk Model Training + MLflow
 # ==========================================
 
@@ -66,6 +65,7 @@ mlflow.set_experiment(
     "credit_risk_probability_model"
 )
 
+
 # ==========================================
 # Evaluation Function
 # ==========================================
@@ -116,6 +116,8 @@ def evaluate_model(
     }
 
     return metrics
+
+
 # ==========================================
 # Logistic Regression
 # ==========================================
@@ -298,7 +300,5 @@ with mlflow.start_run(
     mlflow.sklearn.log_model(
         best_model,
         artifact_path="best_model",
-        registered_model_name=
-        "CreditRiskModel"
+        registered_model_name="CreditRiskModel"
     )
-    
