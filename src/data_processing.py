@@ -346,7 +346,7 @@ def process_data(df):
         "preprocessor"
     ]
     .get_feature_names_out()
-    )
+)
 
     X_df = pd.DataFrame(
         X.toarray(),
@@ -379,7 +379,7 @@ def process_data(df):
     processed_df,
     target_df,
     audit_df,
-    kmeans
+    kmeans,
 )
 
 
@@ -456,7 +456,7 @@ if __name__ == "__main__":
     X_df.to_csv(
     "data/processed/model_ready_features.csv",
     index=False
-    )    
+)
 
     # Save preprocessing pipeline
     joblib.dump(
