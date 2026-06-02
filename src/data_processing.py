@@ -22,11 +22,6 @@ def load_data(filepath):
 # ==========================================
 def create_aggregate_features(df):
 
-#    customer_features["std_transaction_amount"] = (
-#     customer_features["std_transaction_amount"]
-#     .fillna(0)
-# )
-
     customer_features = (
         df.groupby("CustomerId")
         .agg(
