@@ -6,6 +6,7 @@
 
 import pandas as pd
 import joblib
+import numpy as np
 
 from scipy import sparse
 
@@ -22,7 +23,14 @@ from sklearn.cluster import KMeans
 
 
 def load_data(filepath):
-    return pd.read_csv(filepath)
+
+    try:
+        return pd.read_csv(filepath)
+
+    except Exception as e:
+        raise ValueError(
+            f"Unable to load dataset: {e}"
+        )
 
 
 # ==========================================
@@ -98,8 +106,20 @@ class AggregateFeatureTransformer(BaseEstimator, TransformerMixin):
 
 def calculate_rfm(df):
 
-    df = df.copy()
+    required_columns = [
+        "CustomerId",
+        "TransactionId",
+        "Value",
+        "TransactionStartTime"
+    ]
 
+    for col in required_columns:
+        if col not in df.columns:
+            raise ValueError(
+                f"Missing required column: {col}"
+            )
+
+    df = df.copy()
     df["TransactionStartTime"] = pd.to_datetime(df["TransactionStartTime"])
 
     snapshot_date = df["TransactionStartTime"].max() + pd.Timedelta(days=1)
@@ -134,27 +154,55 @@ def create_proxy_target(df):
     scaler = StandardScaler()
 
     rfm_scaled = scaler.fit_transform(
-        rfm[["Recency", "Frequency", "Monetary"]])
-
-    kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
-
-    rfm["Cluster"] = kmeans.fit_predict(rfm_scaled)
-
-    cluster_summary = rfm.groupby("Cluster").agg(
-        {"Recency": "mean", "Frequency": "mean", "Monetary": "mean"}
+        rfm[["Recency", "Frequency", "Monetary"]]
     )
 
-    cluster_summary["RiskScore"] = (
-        cluster_summary["Recency"]
-        - cluster_summary["Frequency"]
-        - cluster_summary["Monetary"]
-    )
+    try:
 
-    high_risk_cluster = cluster_summary["RiskScore"].idxmax()
+        kmeans = KMeans(
+            n_clusters=3,
+            random_state=42,
+            n_init=10
+        )
 
-    rfm["is_high_risk"] = (rfm["Cluster"] == high_risk_cluster).astype(int)
+        rfm["Cluster"] = kmeans.fit_predict(
+            rfm_scaled
+        )
 
-    return (rfm[["CustomerId", "is_high_risk"]], kmeans)
+        cluster_summary = rfm.groupby(
+            "Cluster"
+        ).agg(
+            {
+                "Recency": "mean",
+                "Frequency": "mean",
+                "Monetary": "mean"
+            }
+        )
+
+        cluster_summary["RiskScore"] = (
+            cluster_summary["Recency"]
+            - cluster_summary["Frequency"]
+            - cluster_summary["Monetary"]
+        )
+
+        high_risk_cluster = (
+            cluster_summary["RiskScore"].idxmax()
+        )
+
+        rfm["is_high_risk"] = (
+            rfm["Cluster"] == high_risk_cluster
+        ).astype(int)
+
+        return (
+            rfm[["CustomerId", "is_high_risk"]],
+            kmeans
+        )
+
+    except Exception as e:
+
+        raise ValueError(
+            f"KMeans clustering failed: {e}"
+        )
 
 
 # ==========================================
@@ -248,9 +296,55 @@ full_pipeline = Pipeline(
     ]
 )
 
+# ==========================================
+# 11. calculate_iv
+# ==========================================
+
+
+def calculate_iv(df, feature, target):
+
+    iv_df = pd.DataFrame()
+
+    iv_df["feature"] = df[feature]
+    iv_df["target"] = target
+
+    grouped = iv_df.groupby("feature")
+
+    result = pd.DataFrame()
+
+    result["good"] = grouped["target"].apply(
+        lambda x: (x == 0).sum()
+    )
+
+    result["bad"] = grouped["target"].apply(
+        lambda x: (x == 1).sum()
+    )
+
+    result["good_pct"] = (
+        result["good"] / result["good"].sum()
+    )
+
+    result["bad_pct"] = (
+        result["bad"] / result["bad"].sum()
+    )
+
+    result["woe"] = np.log(
+        (result["good_pct"] + 0.0001)
+        /
+        (result["bad_pct"] + 0.0001)
+    )
+
+    result["iv"] = (
+        result["good_pct"]
+        -
+        result["bad_pct"]
+    ) * result["woe"]
+
+    return result["iv"].sum()
+
 
 # ==========================================
-# 11. Process Data
+# 12. Process Data
 # ==========================================
 
 
@@ -263,6 +357,23 @@ def process_data(df):
     audit_df = df.copy()
 
     y = df["is_high_risk"]
+
+    iv_scores = {}
+
+    for feature in categorical_features:
+        iv_scores[feature] = calculate_iv(
+            df,
+            feature,
+            y
+        )
+
+    pd.DataFrame(
+        iv_scores.items(),
+        columns=["Feature", "IV"]
+    ).to_csv(
+        "data/processed/iv_scores.csv",
+        index=False
+    )
 
     X = full_pipeline.fit_transform(df.drop(columns=["is_high_risk"]))
 
@@ -297,7 +408,7 @@ def process_data(df):
 
 
 # ==========================================
-# 12. Save Sparse Matrix
+# 13. Save Sparse Matrix
 # ==========================================
 
 
@@ -307,8 +418,9 @@ def save_processed_data(transformed_data, filepath):
 
 
 # ==========================================
-# 13. Main
+# 14. Main
 # ==========================================
+
 
 if __name__ == "__main__":
 
