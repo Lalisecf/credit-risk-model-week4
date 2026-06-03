@@ -672,6 +672,8 @@ Feature Impact:
 
 ---
 
+Weight of Evidence (WoE) and Information Value (IV) analysis were implemented for categorical risk assessment. IV scores were calculated for all categorical variables and exported to iv_scores.csv for feature importance evaluation.
+
 # Testing Strategy
 
 Current tests cover:
