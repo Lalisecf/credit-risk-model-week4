@@ -72,6 +72,7 @@ mlflow.set_experiment(
 # Evaluation Function
 # ==========================================
 
+
 def evaluate_model(
     model,
     X_test,
@@ -116,6 +117,7 @@ def evaluate_model(
             y_prob
         )
     }
+
 
 # ==========================================
 # Logistic Regression

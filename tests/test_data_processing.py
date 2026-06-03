@@ -4,6 +4,7 @@ from src.data_processing import (
     calculate_rfm
 )
 
+
 def test_rfm_columns():
 
     df = pd.DataFrame({
