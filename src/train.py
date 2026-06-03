@@ -24,6 +24,11 @@ from sklearn.metrics import (
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.pipeline import Pipeline
+
+from data_processing import (
+    preprocessor
+)
 
 # ==========================================
 # Directories
@@ -32,11 +37,11 @@ from sklearn.ensemble import RandomForestClassifier
 os.makedirs("models", exist_ok=True)
 
 # ==========================================
-# Load Data
+# Load Processed Dataset
 # ==========================================
 
 X = pd.read_csv(
-    "data/processed/model_ready_features.csv"
+    "data/processed/processed_dataset.csv"
 )
 
 y = pd.read_csv(
@@ -47,24 +52,21 @@ y = pd.read_csv(
 # Train Test Split
 # ==========================================
 
-X_train, X_test, y_train, y_test = (
-    train_test_split(
-        X,
-        y,
-        test_size=0.2,
-        random_state=42,
-        stratify=y
-    )
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.2,
+    random_state=42,
+    stratify=y
 )
 
 # ==========================================
-# MLflow Setup
+# MLflow
 # ==========================================
 
 mlflow.set_experiment(
     "credit_risk_probability_model"
 )
-
 
 # ==========================================
 # Evaluation Function
@@ -82,7 +84,7 @@ def evaluate_model(
         X_test
     )[:, 1]
 
-    metrics = {
+    return {
 
         "accuracy":
         accuracy_score(
@@ -115,9 +117,6 @@ def evaluate_model(
         )
     }
 
-    return metrics
-
-
 # ==========================================
 # Logistic Regression
 # ==========================================
@@ -126,24 +125,29 @@ with mlflow.start_run(
     run_name="LogisticRegression"
 ):
 
-    lr = LogisticRegression(
-        random_state=42,
-        max_iter=1000
+    lr_pipeline = Pipeline(
+        [
+            ("preprocessor", preprocessor),
+            (
+                "classifier",
+                LogisticRegression(
+                    random_state=42,
+                    max_iter=1000
+                )
+            )
+        ]
     )
 
-    param_grid = {
-
-        "C": [
-            0.01,
-            0.1,
-            1,
-            10
-        ]
-    }
-
     grid_lr = GridSearchCV(
-        lr,
-        param_grid,
+        lr_pipeline,
+        {
+            "classifier__C": [
+                0.01,
+                0.1,
+                1,
+                10
+            ]
+        },
         cv=5,
         scoring="roc_auc",
         n_jobs=-1
@@ -177,11 +181,9 @@ with mlflow.start_run(
         "model"
     )
 
-    print(
-        "\nLogistic Regression"
-    )
-
+    print("\nLogistic Regression")
     print(metrics)
+
 # ==========================================
 # Random Forest
 # ==========================================
@@ -190,27 +192,31 @@ with mlflow.start_run(
     run_name="RandomForest"
 ):
 
-    rf = RandomForestClassifier(
-        random_state=42
+    rf_pipeline = Pipeline(
+        [
+            ("preprocessor", preprocessor),
+            (
+                "classifier",
+                RandomForestClassifier(
+                    random_state=42
+                )
+            )
+        ]
     )
 
-    param_grid = {
-
-        "n_estimators": [
-            100,
-            200
-        ],
-
-        "max_depth": [
-            5,
-            10,
-            None
-        ]
-    }
-
     grid_rf = GridSearchCV(
-        rf,
-        param_grid,
+        rf_pipeline,
+        {
+            "classifier__n_estimators": [
+                100,
+                200
+            ],
+            "classifier__max_depth": [
+                5,
+                10,
+                None
+            ]
+        },
         cv=5,
         scoring="roc_auc",
         n_jobs=-1
@@ -244,10 +250,7 @@ with mlflow.start_run(
         "model"
     )
 
-    print(
-        "\nRandom Forest"
-    )
-
+    print("\nRandom Forest")
     print(metrics)
 
 # ==========================================
@@ -292,6 +295,10 @@ joblib.dump(
 print(
     "\nModel Saved Successfully"
 )
+
+# ==========================================
+# Register Model
+# ==========================================
 
 with mlflow.start_run(
     run_name="BestModelRegistry"
