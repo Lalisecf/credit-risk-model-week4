@@ -13,15 +13,15 @@ app = FastAPI(
     version="1.0"
 )
 
-model = joblib.load(
-    "models/best_model.pkl"
-)
+model = joblib.load("models/best_model.pkl")
+
 
 @app.get("/")
 def home():
     return {
         "message": "Credit Risk Model API Running"
     }
+
 
 @app.post(
     "/predict",
